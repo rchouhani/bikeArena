@@ -15,7 +15,12 @@ type Step = {
   value: string;
 };
 
-export default function RoutePlannerInput() {
+type RoutePlannerInputProps = {
+  onSetStart?: (pos: { latitude: number; longitude: number }) => void;
+  onSetEnd?: (pos: { latitude: number; longitude: number }) => void;
+};
+
+export default function RoutePlannerInput({ onSetStart, onSetEnd }: RoutePlannerInputProps) {
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [steps, setSteps] = useState<Step[]>([]);
@@ -62,6 +67,18 @@ export default function RoutePlannerInput() {
     console.log("Enregistrer le trajet :", { start, steps, end });
   };
 
+  const handleSelectStart = (lat: number, lon: number) => {
+  setStart(`${lat}, ${lon}`); // ou tu peux garder displayName si tu veux
+  onSetStart?.({ latitude: lat, longitude: lon }); // envoie vers parent
+  setMode("end");
+};
+
+const handleSelectEnd = (lat: number, lon: number) => {
+  setEnd(`${lat}, ${lon}`);
+  onSetEnd?.({ latitude: lat, longitude: lon });
+  setMode("summary");
+};
+
   // ---- UI ----
   return (
     <View style={styles.wrapper}>
@@ -79,9 +96,6 @@ export default function RoutePlannerInput() {
               returnKeyType="done"
               onSubmitEditing={validateStart}
             />
-            <TouchableOpacity onPress={validateStart}>
-              <Ionicons name="checkmark-circle-outline" size={22} />
-            </TouchableOpacity>
           </View>
 
           {/* Suggestions départ */}
@@ -93,6 +107,7 @@ export default function RoutePlannerInput() {
                 <TouchableOpacity
                   style={styles.suggestion}
                   onPress={() => {
+                    handleSelectStart(item.lat, item.lon)
                     setStart(item.displayName);
                     validateStart();
                   }}
@@ -119,9 +134,6 @@ export default function RoutePlannerInput() {
               returnKeyType="done"
               onSubmitEditing={validateEnd}
             />
-            <TouchableOpacity onPress={validateEnd}>
-              <Ionicons name="checkmark-circle-outline" size={22} />
-            </TouchableOpacity>
           </View>
 
           {/* Suggestions arrivée */}
@@ -134,8 +146,9 @@ export default function RoutePlannerInput() {
                 <TouchableOpacity
                   style={styles.suggestion}
                   onPress={() => {
+                    handleSelectEnd(item.lat, item.lon)
                     setEnd(item.displayName);
-                    validateEnd(); // 👈 très important !
+                    validateEnd();
                   }}
                 >
                   <Text>{item.displayName}</Text>
@@ -171,7 +184,7 @@ export default function RoutePlannerInput() {
             onPress={handleConfirmRoute}
             style={styles.actionBtn}
           >
-            <Ionicons name="checkmark-done-outline" size={26} />
+            <Ionicons name="checkmark-done-outline" size={26} color="#34cf20ff" />
           </TouchableOpacity>
 
           <TouchableOpacity onPress={handleSaveRoute} style={styles.actionBtn}>
@@ -179,7 +192,7 @@ export default function RoutePlannerInput() {
           </TouchableOpacity>
 
           <TouchableOpacity onPress={addStep} style={styles.actionBtn}>
-            <Ionicons name="add-circle-outline" size={26} />
+            <Ionicons name="add-circle-outline" size={26} color="#34cf20ff" />
           </TouchableOpacity>
         </View>
       )}
