@@ -17,11 +17,21 @@ export default function MapScreen() {
     longitudeDelta: 0.05,
   });
 
-  const [position, setPosition] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [position, setPosition] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const [start, setStart] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [end, setEnd] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [start, setStart] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+  const [end, setEnd] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+const [steps, setSteps] = useState<{ latitude: number; longitude: number }[]>([]);
 
   const { route, loading, error, getRoute } = useRoutePolyline();
 
@@ -36,8 +46,13 @@ export default function MapScreen() {
         return;
       }
 
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      const userPos = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+      const userPos = {
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+      };
 
       setPosition(userPos);
 
@@ -59,36 +74,49 @@ export default function MapScreen() {
     })();
   }, []);
 
-  // 🔥 Calcul automatique de l’itinéraire dès que start et end sont définis
-  useEffect(() => {
-    if (start && end) {
-      const points: LatLng[] = [
-        { lat: start.latitude, lon: start.longitude },
-        { lat: end.latitude, lon: end.longitude },
-      ];
-      console.log("start: " + "lat : " + start.latitude + "lon : " + start.longitude)
-      getRoute(points);
+  // // 🔥 Calcul automatique de l’itinéraire dès que start et end sont définis
+  // useEffect(() => {
+  //   if (start && end) {
+  //     const points: LatLng[] = [
+  //       { lat: start.latitude, lon: start.longitude },
+  //       { lat: end.latitude, lon: end.longitude },
+  //     ];
+  //     console.log("start: " + "lat : " + start.latitude + "lon : " + start.longitude)
+  //     getRoute(points);
+  //   }
+  // }, [start, end]);
+
+  const handleValidateRoute = () => {
+    if (!start || !end) {
+      console.log("⛔ impossible de calculer : départ ou arrivée manquante");
     }
-  }, [start, end]);
+
+    const points: LatLng[] = [
+      { lat: start.latitude, lon: start.longitude },
+      ...steps.map(s => ({ lat: s.latitude, lon: s.longitude })),
+      { lat: end.latitude, lon: end.longitude },
+    ];
+    console.log("☑️ ITINERAIRE  VALIDE AVEC ETAPES : ", points)
+    getRoute(points);
+  };
 
   useEffect(() => {
-  console.log("🟢 START ACTUEL DANS MapScreen :", start);
-}, [start]);
+    console.log("🟢 START ACTUEL DANS MapScreen :", start);
+  }, [start]);
 
-useEffect(() => {
-  console.log("🔴 END ACTUEL DANS MapScreen :", end);
-}, [end]);
+  useEffect(() => {
+    console.log("🔴 END ACTUEL DANS MapScreen :", end);
+  }, [end]);
 
-console.log("START / END BRUT :", { start, end });
-
+  console.log("START / END BRUT :", { start, end });
 
   // 🔥 Optionnel : recentrer la carte sur la route
   useEffect(() => {
-    if(!route?.coords || route.coords.length === 0) return;
-    
+    if (!route?.coords || route.coords.length === 0) return;
+
     if (route?.coords && route.coords.length > 0) {
-      const lats = route.coords.map(c => c.latitude);
-      const lons = route.coords.map(c => c.longitude);
+      const lats = route.coords.map((c) => c.latitude);
+      const lons = route.coords.map((c) => c.longitude);
       const minLat = Math.min(...lats);
       const maxLat = Math.max(...lats);
       const minLon = Math.min(...lons);
@@ -112,7 +140,11 @@ console.log("START / END BRUT :", { start, end });
         {end && <Marker coordinate={end} pinColor="red" title="Arrivée" />}
 
         {route?.coords && route.coords.length > 0 && (
-          <Polyline coordinates={route.coords} strokeWidth={4} strokeColor="blue" />
+          <Polyline
+            coordinates={route.coords}
+            strokeWidth={4}
+            strokeColor="blue"
+          />
         )}
       </MapView>
 
@@ -121,9 +153,14 @@ console.log("START / END BRUT :", { start, end });
       {error && <Text style={styles.error}>{error}</Text>}
 
       {activeTab === "home" && (
-        <RoutePlannerInput onSetStart={setStart} onSetEnd={setEnd} />
+        <RoutePlannerInput
+          onSetStart={setStart}
+          onSetEnd={setEnd}
+          // onSetSteps={setSteps}
+          onValidateRoute={handleValidateRoute}
+
+        />
       )}
-      
 
       <Tabbar active={activeTab} onChange={setActiveTab} />
     </View>

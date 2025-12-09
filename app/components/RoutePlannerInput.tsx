@@ -12,24 +12,27 @@ import useCitySearch from "../../src/hooks/useCitySearch";
 
 type Step = {
   id: string;
-  value: string;
+  label: string;
+  position: { latitude: number; longitude: number } | null;
 };
 
 type RoutePlannerInputProps = {
   onSetStart?: (pos: { latitude: number; longitude: number }) => void;
   onSetEnd?: (pos: { latitude: number; longitude: number }) => void;
+  onValidateRoute?: () => void;
+  onSetSteps?: (steps: { latitude: number; longitude: number }[]) => void;
 };
 
 export default function RoutePlannerInput({
   onSetStart,
   onSetEnd,
+  onValidateRoute,
+  onSetSteps,
 }: RoutePlannerInputProps) {
-
-console.log("🧩 PROPS REÇUES DANS RoutePlannerInput :", {
-  onSetStart,
-  onSetEnd,
-});
-
+  console.log("🧩 PROPS REÇUES DANS RoutePlannerInput :", {
+    onSetStart,
+    onSetEnd,
+  });
 
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
@@ -41,7 +44,7 @@ console.log("🧩 PROPS REÇUES DANS RoutePlannerInput :", {
   // --- Recherche ville ---
   const { results: startResults, loading: startLoading } = useCitySearch(start);
   const { results: endResults, loading: endLoading } = useCitySearch(end);
-
+  const { results: stepResults } = useCitySearch(steps.label);
   // console.log("END RESUTS : ", endResults);
 
   // ---- Handlers ----
@@ -56,7 +59,11 @@ console.log("🧩 PROPS REÇUES DANS RoutePlannerInput :", {
   };
 
   const addStep = () => {
-    const newStep: Step = { id: Date.now().toString(), value: "" };
+    const newStep: Step = {
+      id: Date.now().toString(),
+      label: "",
+      position: null,
+    };
     setSteps((prev) => [...prev, newStep]);
     setMode("summary");
   };
@@ -72,7 +79,8 @@ console.log("🧩 PROPS REÇUES DANS RoutePlannerInput :", {
   };
 
   const handleConfirmRoute = () => {
-    console.log("Trajet validé :", { start, steps, end });
+    console.log("Trajet validé :");
+    onValidateRoute?.();
   };
 
   const handleSaveRoute = () => {
@@ -81,19 +89,39 @@ console.log("🧩 PROPS REÇUES DANS RoutePlannerInput :", {
 
   const handleSelectStart = (lat: number, lon: number) => {
     setStart(`${lat}, ${lon}`); // ou tu peux garder displayName si tu veux
-    console.log("setStart de handleSelectStart : ", setStart)
+    console.log("setStart de handleSelectStart : ", setStart);
     onSetStart?.({ latitude: lat, longitude: lon }); // envoie vers parent
-    console.log("📍📍📍onsetStart dans handle select start : ", onSetStart)
+    console.log("📍📍📍onsetStart dans handle select start : ", onSetStart);
     setMode("end");
   };
 
   const handleSelectEnd = (lat: number, lon: number) => {
     setEnd(`${lat}, ${lon}`);
-    console.log("setEnd dans handleSelectEnd : ", setEnd)
+    console.log("setEnd dans handleSelectEnd : ", setEnd);
     onSetEnd?.({ latitude: lat, longitude: lon });
-    console.log('😴😴😴😴onSetEnd dans handle select end : ', onSetEnd)
+    console.log("😴😴😴😴onSetEnd dans handle select end : ", onSetEnd);
     setMode("summary");
   };
+
+  const handleSelectStep = (
+    id: string,
+    lat: number,
+    lon: number,
+    displayName: string
+  ) => {
+    setSteps((prev) =>
+      prev.map((step) =>
+        step.id === id
+          ? {
+              ...step,
+              label: displayName,
+              position: { latitude: lat, longitude: lon },
+            }
+          : step
+      )
+    );
+  };
+  
 
   // ---- UI ----
   return (
@@ -195,11 +223,13 @@ console.log("🧩 PROPS REÇUES DANS RoutePlannerInput :", {
       {/* ÉTAPES */}
       {mode === "summary" &&
         steps.map((step) => (
+          const { results } = useCitySearch(step.label);
+
           <View key={step.id} style={styles.inputRow}>
             <Ionicons name="trail-sign-outline" size={20} color="black" />
             <TextInput
               placeholder="Étape intermédiaire"
-              value={step.value}
+              value={step.label}
               onChangeText={(txt) => updateStep(step.id, txt)}
               style={styles.input}
               returnKeyType="done"
@@ -240,7 +270,7 @@ console.log("🧩 PROPS REÇUES DANS RoutePlannerInput :", {
 const styles = StyleSheet.create({
   wrapper: {
     position: "absolute",
-    top: 650,
+    top: 5,
     left: "50%",
     width: 250,
     transform: [{ translateX: -125 }],
