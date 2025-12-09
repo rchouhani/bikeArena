@@ -40,7 +40,6 @@ export default function MapScreen() {
       const userPos = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
 
       setPosition(userPos);
-      setRegion((r) => ({ ...r, ...userPos }));
 
       const sub = await Location.watchPositionAsync(
         {
@@ -67,13 +66,26 @@ export default function MapScreen() {
         { lat: start.latitude, lon: start.longitude },
         { lat: end.latitude, lon: end.longitude },
       ];
+      console.log("start: " + "lat : " + start.latitude + "lon : " + start.longitude)
       getRoute(points);
     }
   }, [start, end]);
 
+  useEffect(() => {
+  console.log("🟢 START ACTUEL DANS MapScreen :", start);
+}, [start]);
+
+useEffect(() => {
+  console.log("🔴 END ACTUEL DANS MapScreen :", end);
+}, [end]);
+
+console.log("START / END BRUT :", { start, end });
+
+
   // 🔥 Optionnel : recentrer la carte sur la route
   useEffect(() => {
     if(!route?.coords || route.coords.length === 0) return;
+    
     if (route?.coords && route.coords.length > 0) {
       const lats = route.coords.map(c => c.latitude);
       const lons = route.coords.map(c => c.longitude);
@@ -111,6 +123,7 @@ export default function MapScreen() {
       {activeTab === "home" && (
         <RoutePlannerInput onSetStart={setStart} onSetEnd={setEnd} />
       )}
+      
 
       <Tabbar active={activeTab} onChange={setActiveTab} />
     </View>
