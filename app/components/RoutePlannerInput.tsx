@@ -20,7 +20,17 @@ type RoutePlannerInputProps = {
   onSetEnd?: (pos: { latitude: number; longitude: number }) => void;
 };
 
-export default function RoutePlannerInput({ onSetStart, onSetEnd }: RoutePlannerInputProps) {
+export default function RoutePlannerInput({
+  onSetStart,
+  onSetEnd,
+}: RoutePlannerInputProps) {
+
+console.log("🧩 PROPS REÇUES DANS RoutePlannerInput :", {
+  onSetStart,
+  onSetEnd,
+});
+
+
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [steps, setSteps] = useState<Step[]>([]);
@@ -31,6 +41,8 @@ export default function RoutePlannerInput({ onSetStart, onSetEnd }: RoutePlanner
   // --- Recherche ville ---
   const { results: startResults, loading: startLoading } = useCitySearch(start);
   const { results: endResults, loading: endLoading } = useCitySearch(end);
+
+  // console.log("END RESUTS : ", endResults);
 
   // ---- Handlers ----
   const validateStart = () => {
@@ -68,16 +80,20 @@ export default function RoutePlannerInput({ onSetStart, onSetEnd }: RoutePlanner
   };
 
   const handleSelectStart = (lat: number, lon: number) => {
-  setStart(`${lat}, ${lon}`); // ou tu peux garder displayName si tu veux
-  onSetStart?.({ latitude: lat, longitude: lon }); // envoie vers parent
-  setMode("end");
-};
+    setStart(`${lat}, ${lon}`); // ou tu peux garder displayName si tu veux
+    console.log("setStart de handleSelectStart : ", setStart)
+    onSetStart?.({ latitude: lat, longitude: lon }); // envoie vers parent
+    console.log("📍📍📍onsetStart dans handle select start : ", onSetStart)
+    setMode("end");
+  };
 
-const handleSelectEnd = (lat: number, lon: number) => {
-  setEnd(`${lat}, ${lon}`);
-  onSetEnd?.({ latitude: lat, longitude: lon });
-  setMode("summary");
-};
+  const handleSelectEnd = (lat: number, lon: number) => {
+    setEnd(`${lat}, ${lon}`);
+    console.log("setEnd dans handleSelectEnd : ", setEnd)
+    onSetEnd?.({ latitude: lat, longitude: lon });
+    console.log('😴😴😴😴onSetEnd dans handle select end : ', onSetEnd)
+    setMode("summary");
+  };
 
   // ---- UI ----
   return (
@@ -102,12 +118,21 @@ const handleSelectEnd = (lat: number, lon: number) => {
           {startResults.length > 0 && (
             <FlatList
               data={startResults}
-              keyExtractor={(item) => item.osm_id}
+              keyExtractor={(item, index) =>
+                item.osm_id ? String(item.osm_id) : `fallback-${index}`
+              }
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={styles.suggestion}
                   onPress={() => {
-                    handleSelectStart(item.lat, item.lon)
+                    // console.log("💚 START ITEM COMPLET : ", item);
+
+                    // console.log("✅ START SELECTED →", {
+                    //   lat: item.lat,
+                    //   lon: item.lon,
+                    // });
+
+                    handleSelectStart(item.lat, item.lon);
                     setStart(item.displayName);
                     validateStart();
                   }}
@@ -140,13 +165,21 @@ const handleSelectEnd = (lat: number, lon: number) => {
           {mode !== "summary" && endResults.length > 0 && (
             <FlatList
               data={endResults}
-              keyExtractor={(item) => item.osm_id}
+              keyExtractor={(item, index) =>
+                item.osm_id ? String(item.osm_id) : `fallback-${index}`
+              }
               style={styles.suggestion}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={styles.suggestion}
                   onPress={() => {
-                    handleSelectEnd(item.lat, item.lon)
+                    // console.log("💓 END ITEM COMPLET : ", item);
+
+                    // console.log("✅ END SELECTED →", {
+                    //   lat: item.lat,
+                    //   lon: item.lon,
+                    // });
+                    handleSelectEnd(item.lat, item.lon);
                     setEnd(item.displayName);
                     validateEnd();
                   }}
@@ -184,7 +217,11 @@ const handleSelectEnd = (lat: number, lon: number) => {
             onPress={handleConfirmRoute}
             style={styles.actionBtn}
           >
-            <Ionicons name="checkmark-done-outline" size={26} color="#34cf20ff" />
+            <Ionicons
+              name="checkmark-done-outline"
+              size={26}
+              color="#34cf20ff"
+            />
           </TouchableOpacity>
 
           <TouchableOpacity onPress={handleSaveRoute} style={styles.actionBtn}>
@@ -203,7 +240,7 @@ const handleSelectEnd = (lat: number, lon: number) => {
 const styles = StyleSheet.create({
   wrapper: {
     position: "absolute",
-    top: 450,
+    top: 650,
     left: "50%",
     width: 250,
     transform: [{ translateX: -125 }],
