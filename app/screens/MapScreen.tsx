@@ -88,7 +88,7 @@ const [steps, setSteps] = useState<{ latitude: number; longitude: number }[]>([]
 
   const handleValidateRoute = () => {
     if (!start || !end) {
-      console.log("⛔ impossible de calculer : départ ou arrivée manquante");
+      // console.log("⛔ impossible de calculer : départ ou arrivée manquante");
     }
 
     const points: LatLng[] = [
@@ -96,19 +96,19 @@ const [steps, setSteps] = useState<{ latitude: number; longitude: number }[]>([]
       ...steps.map(s => ({ lat: s.latitude, lon: s.longitude })),
       { lat: end.latitude, lon: end.longitude },
     ];
-    console.log("☑️ ITINERAIRE  VALIDE AVEC ETAPES : ", points)
+    console.log("☑️☑️☑️☑️ ITINERAIRE  VALIDE AVEC ETAPES : ", steps)
     getRoute(points);
   };
 
-  useEffect(() => {
-    console.log("🟢 START ACTUEL DANS MapScreen :", start);
-  }, [start]);
+  // useEffect(() => {
+  //   console.log("🟢 START ACTUEL DANS MapScreen :", start);
+  // }, [start]);
 
-  useEffect(() => {
-    console.log("🔴 END ACTUEL DANS MapScreen :", end);
-  }, [end]);
+  // useEffect(() => {
+  //   console.log("🔴 END ACTUEL DANS MapScreen :", end);
+  // }, [end]);
 
-  console.log("START / END BRUT :", { start, end });
+  // console.log("START / END BRUT :", { start, end });
 
   // 🔥 Optionnel : recentrer la carte sur la route
   useEffect(() => {
@@ -156,7 +156,7 @@ const [steps, setSteps] = useState<{ latitude: number; longitude: number }[]>([]
         <RoutePlannerInput
           onSetStart={setStart}
           onSetEnd={setEnd}
-          // onSetSteps={setSteps}
+          onSetSteps={setSteps}
           onValidateRoute={handleValidateRoute}
 
         />
