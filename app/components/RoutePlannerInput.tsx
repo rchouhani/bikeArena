@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import { searchCity } from "@src/services/nominatim";
+import React, { useEffect, useState } from "react";
 import {
   FlatList,
   StyleSheet,
@@ -29,25 +30,30 @@ export default function RoutePlannerInput({
   onValidateRoute,
   onSetSteps,
 }: RoutePlannerInputProps) {
-  console.log("🧩 PROPS REÇUES DANS RoutePlannerInput :", {
-    onSetStart,
-    onSetEnd,
-  });
-
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [steps, setSteps] = useState<Step[]>([]);
-  const [mode, setMode] = useState<"idle" | "start" | "end" | "summary">(
-    "idle"
-  );
+  const [mode, setMode] = useState<"idle" | "start" | "end" | "summary">("idle");
 
-  // --- Recherche ville ---
-  const { results: startResults, loading: startLoading } = useCitySearch(start);
-  const { results: endResults, loading: endLoading } = useCitySearch(end);
-  const { results: stepResults } = useCitySearch(steps.label);
-  // console.log("END RESUTS : ", endResults);
+  // ✅ SUGGESTIONS CENTRALISÉES PAR ÉTAPE
+  const [stepSearchResults, setStepSearchResults] = useState<
+    Record<string, any[]>
+  >({});
+
+  // --- Recherche ville départ & arrivée ---
+  const { results: startResults } = useCitySearch(start);
+  const { results: endResults } = useCitySearch(end);
 
   // ---- Handlers ----
+
+useEffect(() => {
+  const validSteps = steps
+    .filter((s) => s.position !== null)
+    .map((s) => s.position!);
+
+    onSetSteps?.(validSteps)
+}, [steps])
+
   const validateStart = () => {
     if (!start.trim()) return;
     setMode("end");
@@ -68,38 +74,40 @@ export default function RoutePlannerInput({
     setMode("summary");
   };
 
-  const updateStep = (id: string, val: string) => {
+  // ✅ RECHERCHE DÉPORTÉE HORS DU RENDER
+  const updateStep = async (id: string, val: string) => {
     setSteps((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, value: val } : s))
+      prev.map((s) => (s.id === id ? { ...s, label: val } : s))
     );
+
+    if (val.length < 3) return;
+
+    const results = await searchCity(val);
+
+    setStepSearchResults((prev) => ({
+      ...prev,
+      [id]: results,
+    }));
   };
 
   const removeStep = (id: string) => {
     setSteps((prev) => prev.filter((s) => s.id !== id));
+    setStepSearchResults((prev) => {
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
   };
 
-  const handleConfirmRoute = () => {
-    console.log("Trajet validé :");
-    onValidateRoute?.();
-  };
-
-  const handleSaveRoute = () => {
-    console.log("Enregistrer le trajet :", { start, steps, end });
-  };
-
-  const handleSelectStart = (lat: number, lon: number) => {
-    setStart(`${lat}, ${lon}`); // ou tu peux garder displayName si tu veux
-    console.log("setStart de handleSelectStart : ", setStart);
-    onSetStart?.({ latitude: lat, longitude: lon }); // envoie vers parent
-    console.log("📍📍📍onsetStart dans handle select start : ", onSetStart);
+  const handleSelectStart = (lat: number, lon: number, name: string) => {
+    setStart(name);
+    onSetStart?.({ latitude: lat, longitude: lon });
     setMode("end");
   };
 
-  const handleSelectEnd = (lat: number, lon: number) => {
-    setEnd(`${lat}, ${lon}`);
-    console.log("setEnd dans handleSelectEnd : ", setEnd);
+  const handleSelectEnd = (lat: number, lon: number, name: string) => {
+    setEnd(name);
     onSetEnd?.({ latitude: lat, longitude: lon });
-    console.log("😴😴😴😴onSetEnd dans handle select end : ", onSetEnd);
     setMode("summary");
   };
 
@@ -120,15 +128,19 @@ export default function RoutePlannerInput({
           : step
       )
     );
+
+    setStepSearchResults((prev) => ({
+      ...prev,
+      [id]: [],
+    }));
   };
-  
 
   // ---- UI ----
+
   return (
     <View style={styles.wrapper}>
-      {/* INPUT DÉPART */}
       {(mode === "idle" || mode === "start") && (
-        <View>
+        <>
           <View style={styles.inputRow}>
             <Ionicons name="location-outline" size={20} color="black" />
             <TextInput
@@ -142,7 +154,6 @@ export default function RoutePlannerInput({
             />
           </View>
 
-          {/* Suggestions départ */}
           {startResults.length > 0 && (
             <FlatList
               data={startResults}
@@ -152,30 +163,20 @@ export default function RoutePlannerInput({
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={styles.suggestion}
-                  onPress={() => {
-                    // console.log("💚 START ITEM COMPLET : ", item);
-
-                    // console.log("✅ START SELECTED →", {
-                    //   lat: item.lat,
-                    //   lon: item.lon,
-                    // });
-
-                    handleSelectStart(item.lat, item.lon);
-                    setStart(item.displayName);
-                    validateStart();
-                  }}
+                  onPress={() =>
+                    handleSelectStart(item.lat, item.lon, item.displayName)
+                  }
                 >
                   <Text>{item.displayName}</Text>
                 </TouchableOpacity>
               )}
             />
           )}
-        </View>
+        </>
       )}
 
-      {/* INPUT ARRIVÉE */}
       {(mode === "end" || mode === "summary") && (
-        <View>
+        <>
           <View style={styles.inputRow}>
             <Ionicons name="flag-outline" size={20} color="black" />
             <TextInput
@@ -189,64 +190,76 @@ export default function RoutePlannerInput({
             />
           </View>
 
-          {/* Suggestions arrivée */}
           {mode !== "summary" && endResults.length > 0 && (
             <FlatList
               data={endResults}
               keyExtractor={(item, index) =>
                 item.osm_id ? String(item.osm_id) : `fallback-${index}`
               }
-              style={styles.suggestion}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={styles.suggestion}
-                  onPress={() => {
-                    // console.log("💓 END ITEM COMPLET : ", item);
-
-                    // console.log("✅ END SELECTED →", {
-                    //   lat: item.lat,
-                    //   lon: item.lon,
-                    // });
-                    handleSelectEnd(item.lat, item.lon);
-                    setEnd(item.displayName);
-                    validateEnd();
-                  }}
+                  onPress={() =>
+                    handleSelectEnd(item.lat, item.lon, item.displayName)
+                  }
                 >
                   <Text>{item.displayName}</Text>
                 </TouchableOpacity>
               )}
             />
           )}
-        </View>
+        </>
       )}
 
-      {/* ÉTAPES */}
       {mode === "summary" &&
         steps.map((step) => (
-          const { results } = useCitySearch(step.label);
+          <View key={step.id}>
+            <View style={styles.inputRow}>
+              <Ionicons name="trail-sign-outline" size={20} color="black" />
+              <TextInput
+                placeholder="Étape intermédiaire"
+                value={step.label}
+                onChangeText={(txt) => updateStep(step.id, txt)}
+                style={styles.input}
+              />
+              <TouchableOpacity onPress={() => removeStep(step.id)}>
+                <Ionicons
+                  name="close-circle-outline"
+                  size={22}
+                  color="#c0392b"
+                />
+              </TouchableOpacity>
+            </View>
 
-          <View key={step.id} style={styles.inputRow}>
-            <Ionicons name="trail-sign-outline" size={20} color="black" />
-            <TextInput
-              placeholder="Étape intermédiaire"
-              value={step.label}
-              onChangeText={(txt) => updateStep(step.id, txt)}
-              style={styles.input}
-              returnKeyType="done"
-            />
-            <TouchableOpacity onPress={() => removeStep(step.id)}>
-              <Ionicons name="close-circle-outline" size={22} color="#c0392b" />
-            </TouchableOpacity>
+            {stepSearchResults[step.id]?.length > 0 && (
+              <FlatList
+                data={stepSearchResults[step.id]}
+                keyExtractor={(item, index) =>
+                  item.osm_id ? String(item.osm_id) : `fallback-${index}`
+                }
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.suggestion}
+                    onPress={() =>
+                      handleSelectStep(
+                        step.id,
+                        item.lat,
+                        item.lon,
+                        item.displayName
+                      )
+                    }
+                  >
+                    <Text>{item.displayName}</Text>
+                  </TouchableOpacity>
+                )}
+              />
+            )}
           </View>
         ))}
 
-      {/* ACTIONS */}
       {mode === "summary" && (
         <View style={styles.actionsRow}>
-          <TouchableOpacity
-            onPress={handleConfirmRoute}
-            style={styles.actionBtn}
-          >
+          <TouchableOpacity onPress={onValidateRoute} style={styles.actionBtn}>
             <Ionicons
               name="checkmark-done-outline"
               size={26}
@@ -254,12 +267,12 @@ export default function RoutePlannerInput({
             />
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={handleSaveRoute} style={styles.actionBtn}>
-            <Ionicons name="save-outline" size={26} />
-          </TouchableOpacity>
-
           <TouchableOpacity onPress={addStep} style={styles.actionBtn}>
-            <Ionicons name="add-circle-outline" size={26} color="#34cf20ff" />
+            <Ionicons
+              name="add-circle-outline"
+              size={26}
+              color="#34cf20ff"
+            />
           </TouchableOpacity>
         </View>
       )}
