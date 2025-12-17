@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { searchCity } from "@src/services/nominatim";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   FlatList,
   StyleSheet,
@@ -9,6 +9,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import DraggableFlatList, {
+  RenderItemParams,
+} from "react-native-draggable-flatlist";
 import useCitySearch from "../../src/hooks/useCitySearch";
 
 type Step = {
@@ -20,42 +23,39 @@ type Step = {
 type RoutePlannerInputProps = {
   onSetStart?: (pos: { latitude: number; longitude: number }) => void;
   onSetEnd?: (pos: { latitude: number; longitude: number }) => void;
-  onValidateRoute?: () => void;
   onSetSteps?: (steps: { latitude: number; longitude: number }[]) => void;
+  start?: { latitude: number; longitude: number };
+  end?: { latitude: number; longitude: number };
+  getRoute?: (points: { lat: number; lon: number }[]) => void;
 };
 
 export default function RoutePlannerInput({
   onSetStart,
   onSetEnd,
-  onValidateRoute,
   onSetSteps,
+  start: startCoords,
+  end: endCoords,
+  getRoute,
 }: RoutePlannerInputProps) {
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [steps, setSteps] = useState<Step[]>([]);
   const [mode, setMode] = useState<"idle" | "start" | "end" | "summary">("idle");
 
-  // ✅ SUGGESTIONS CENTRALISÉES PAR ÉTAPE
   const [stepSearchResults, setStepSearchResults] = useState<
     Record<string, any[]>
   >({});
+  const [activeStepId, setActiveStepId] = useState<string | null>(null);
 
-  // --- Recherche ville départ & arrivée ---
+  /** 🔹 contrôle explicite de l’affichage des suggestions départ */
+  const [showStartSuggestions, setShowStartSuggestions] = useState(false);
+
   const { results: startResults } = useCitySearch(start);
   const { results: endResults } = useCitySearch(end);
 
-  // ---- Handlers ----
-
-useEffect(() => {
-  const validSteps = steps
-    .filter((s) => s.position !== null)
-    .map((s) => s.position!);
-
-    onSetSteps?.(validSteps)
-}, [steps])
-
   const validateStart = () => {
     if (!start.trim()) return;
+    setShowStartSuggestions(false);
     setMode("end");
   };
 
@@ -65,29 +65,21 @@ useEffect(() => {
   };
 
   const addStep = () => {
-    const newStep: Step = {
-      id: Date.now().toString(),
-      label: "",
-      position: null,
-    };
-    setSteps((prev) => [...prev, newStep]);
-    setMode("summary");
+    setSteps((prev) => [
+      ...prev,
+      { id: Date.now().toString(), label: "", position: null },
+    ]);
   };
 
-  // ✅ RECHERCHE DÉPORTÉE HORS DU RENDER
-  const updateStep = async (id: string, val: string) => {
+  const updateStep = async (id: string, value: string) => {
     setSteps((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, label: val } : s))
+      prev.map((s) => (s.id === id ? { ...s, label: value } : s))
     );
 
-    if (val.length < 3) return;
+    if (value.length < 3) return;
 
-    const results = await searchCity(val);
-
-    setStepSearchResults((prev) => ({
-      ...prev,
-      [id]: results,
-    }));
+    const results = await searchCity(value);
+    setStepSearchResults((prev) => ({ ...prev, [id]: results }));
   };
 
   const removeStep = (id: string) => {
@@ -102,6 +94,7 @@ useEffect(() => {
   const handleSelectStart = (lat: number, lon: number, name: string) => {
     setStart(name);
     onSetStart?.({ latitude: lat, longitude: lon });
+    setShowStartSuggestions(false);
     setMode("end");
   };
 
@@ -115,167 +108,171 @@ useEffect(() => {
     id: string,
     lat: number,
     lon: number,
-    displayName: string
+    name: string
   ) => {
     setSteps((prev) =>
       prev.map((step) =>
         step.id === id
           ? {
               ...step,
-              label: displayName,
+              label: name,
               position: { latitude: lat, longitude: lon },
             }
           : step
       )
     );
 
-    setStepSearchResults((prev) => ({
-      ...prev,
-      [id]: [],
-    }));
+    setStepSearchResults((prev) => ({ ...prev, [id]: [] }));
+    setActiveStepId(null);
   };
 
-  // ---- UI ----
+  const handleValidate = () => {
+    if (!startCoords || !endCoords) return;
+
+    const validSteps = steps.filter((s) => s.position).map((s) => s.position!);
+
+    const points = [
+      { lat: startCoords.latitude, lon: startCoords.longitude },
+      ...validSteps.map((p) => ({ lat: p.latitude, lon: p.longitude })),
+      { lat: endCoords.latitude, lon: endCoords.longitude },
+    ];
+
+    onSetSteps?.(validSteps);
+    getRoute?.(points);
+  };
+
+  const renderStep = ({ item, drag }: RenderItemParams<Step>) => (
+    <View style={styles.inputRow}>
+      <Ionicons name="trail-sign-outline" size={20} />
+
+      <TextInput
+        value={item.label}
+        placeholder="Étape intermédiaire"
+        onFocus={() => setActiveStepId(item.id)}
+        onChangeText={(txt) => updateStep(item.id, txt)}
+        style={styles.input}
+      />
+
+      <TouchableOpacity onPress={() => removeStep(item.id)}>
+        <Ionicons name="close-circle-outline" size={22} color="#c0392b" />
+      </TouchableOpacity>
+
+      <TouchableOpacity onLongPress={drag}>
+        <Ionicons name="reorder-three-outline" size={22} />
+      </TouchableOpacity>
+
+      {activeStepId === item.id && stepSearchResults[item.id]?.length > 0 && (
+        <FlatList
+          keyboardShouldPersistTaps="handled"
+          data={stepSearchResults[item.id]}
+          keyExtractor={(it, i) => it.osm_id?.toString() ?? `k-${i}`}
+          renderItem={({ item: s }) => (
+            <TouchableOpacity
+              style={styles.suggestion}
+              onPress={() =>
+                handleSelectStep(item.id, s.lat, s.lon, s.displayName)
+              }
+            >
+              <Text>{s.displayName}</Text>
+            </TouchableOpacity>
+          )}
+        />
+      )}
+    </View>
+  );
 
   return (
     <View style={styles.wrapper}>
-      {(mode === "idle" || mode === "start") && (
-        <>
-          <View style={styles.inputRow}>
-            <Ionicons name="location-outline" size={20} color="black" />
-            <TextInput
-              placeholder="Ville de départ"
-              value={start}
-              onChangeText={setStart}
-              onFocus={() => setMode("start")}
-              style={styles.input}
-              returnKeyType="done"
-              onSubmitEditing={validateStart}
-            />
-          </View>
+      {/* 🔹 DÉPART */}
+      <View style={styles.inputRow}>
+        <Ionicons name="location-outline" size={20} />
+        <TextInput
+          value={start}
+          placeholder="Ville de départ"
+          editable={mode !== "summary"}
+          onFocus={() => {
+            setMode("start");
+            setShowStartSuggestions(true);
+          }}
+          onChangeText={(txt) => {
+            setStart(txt);
+            if (!txt) setShowStartSuggestions(false);
+          }}
+          onSubmitEditing={validateStart}
+          style={[
+            styles.input,
+            mode === "summary" && styles.readOnlyInput,
+          ]}
+        />
+      </View>
 
-          {startResults.length > 0 && (
-            <FlatList
-              data={startResults}
-              keyExtractor={(item, index) =>
-                item.osm_id ? String(item.osm_id) : `fallback-${index}`
+      {showStartSuggestions && startResults.length > 0 && (
+        <FlatList
+          data={startResults}
+          keyExtractor={(i, idx) => i.osm_id?.toString() ?? `${idx}`}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.suggestion}
+              onPress={() =>
+                handleSelectStart(item.lat, item.lon, item.displayName)
               }
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.suggestion}
-                  onPress={() =>
-                    handleSelectStart(item.lat, item.lon, item.displayName)
-                  }
-                >
-                  <Text>{item.displayName}</Text>
-                </TouchableOpacity>
-              )}
-            />
+            >
+              <Text>{item.displayName}</Text>
+            </TouchableOpacity>
           )}
-        </>
+        />
       )}
 
-      {(mode === "end" || mode === "summary") && (
-        <>
-          <View style={styles.inputRow}>
-            <Ionicons name="flag-outline" size={20} color="black" />
-            <TextInput
-              placeholder="Ville d'arrivée"
-              value={end}
-              onChangeText={setEnd}
-              onFocus={() => setMode("end")}
-              style={styles.input}
-              returnKeyType="done"
-              onSubmitEditing={validateEnd}
-            />
-          </View>
+      {/* 🔹 ARRIVÉE */}
+      <View style={styles.inputRow}>
+        <Ionicons name="flag-outline" size={20} />
+        <TextInput
+          value={end}
+          placeholder="Ville d'arrivée"
+          editable={mode !== "summary"}
+          onChangeText={setEnd}
+          onSubmitEditing={validateEnd}
+          style={[
+            styles.input,
+            mode === "summary" && styles.readOnlyInput,
+          ]}
+        />
+      </View>
 
-          {mode !== "summary" && endResults.length > 0 && (
-            <FlatList
-              data={endResults}
-              keyExtractor={(item, index) =>
-                item.osm_id ? String(item.osm_id) : `fallback-${index}`
+      {mode !== "summary" && endResults.length > 0 && (
+        <FlatList
+          data={endResults}
+          keyExtractor={(i, idx) => i.osm_id?.toString() ?? `${idx}`}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.suggestion}
+              onPress={() =>
+                handleSelectEnd(item.lat, item.lon, item.displayName)
               }
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.suggestion}
-                  onPress={() =>
-                    handleSelectEnd(item.lat, item.lon, item.displayName)
-                  }
-                >
-                  <Text>{item.displayName}</Text>
-                </TouchableOpacity>
-              )}
-            />
+            >
+              <Text>{item.displayName}</Text>
+            </TouchableOpacity>
           )}
-        </>
+        />
       )}
 
-      {mode === "summary" &&
-        steps.map((step) => (
-          <View key={step.id}>
-            <View style={styles.inputRow}>
-              <Ionicons name="trail-sign-outline" size={20} color="black" />
-              <TextInput
-                placeholder="Étape intermédiaire"
-                value={step.label}
-                onChangeText={(txt) => updateStep(step.id, txt)}
-                style={styles.input}
-              />
-              <TouchableOpacity onPress={() => removeStep(step.id)}>
-                <Ionicons
-                  name="close-circle-outline"
-                  size={22}
-                  color="#c0392b"
-                />
-              </TouchableOpacity>
-            </View>
+      {/* 🔹 ÉTAPES */}
+      <DraggableFlatList
+        data={steps}
+        onDragEnd={({ data }) => setSteps(data)}
+        keyExtractor={(item) => item.id}
+        renderItem={renderStep}
+      />
 
-            {stepSearchResults[step.id]?.length > 0 && (
-              <FlatList
-                data={stepSearchResults[step.id]}
-                keyExtractor={(item, index) =>
-                  item.osm_id ? String(item.osm_id) : `fallback-${index}`
-                }
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.suggestion}
-                    onPress={() =>
-                      handleSelectStep(
-                        step.id,
-                        item.lat,
-                        item.lon,
-                        item.displayName
-                      )
-                    }
-                  >
-                    <Text>{item.displayName}</Text>
-                  </TouchableOpacity>
-                )}
-              />
-            )}
-          </View>
-        ))}
+      <View style={styles.actionsRow}>
+        <TouchableOpacity onPress={handleValidate}>
+          <Ionicons name="checkmark-done-outline" size={26} color="green" />
+        </TouchableOpacity>
 
-      {mode === "summary" && (
-        <View style={styles.actionsRow}>
-          <TouchableOpacity onPress={onValidateRoute} style={styles.actionBtn}>
-            <Ionicons
-              name="checkmark-done-outline"
-              size={26}
-              color="#34cf20ff"
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={addStep} style={styles.actionBtn}>
-            <Ionicons
-              name="add-circle-outline"
-              size={26}
-              color="#34cf20ff"
-            />
-          </TouchableOpacity>
-        </View>
-      )}
+        <TouchableOpacity onPress={addStep}>
+          <Ionicons name="add-circle-outline" size={26} color="green" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -299,17 +296,14 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     marginBottom: 2,
   },
-  input: {
-    flex: 1,
-    marginLeft: 8,
+  input: { flex: 1, marginLeft: 8 },
+  readOnlyInput: {
+    opacity: 0.6,
   },
   actionsRow: {
     flexDirection: "row",
     justifyContent: "space-around",
-    marginTop: 4,
-  },
-  actionBtn: {
-    padding: 8,
+    marginTop: 6,
   },
   suggestion: {
     padding: 6,
