@@ -1,5 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
+import useCitySearch from "@src/hooks/useCitySearch";
 import { searchCity } from "@src/services/nominatim";
+import { buildRoutePoints } from "@src/utils/routePlanner.utils";
 import React, { useState } from "react";
 import {
   FlatList,
@@ -12,7 +14,6 @@ import {
 import DraggableFlatList, {
   RenderItemParams,
 } from "react-native-draggable-flatlist";
-import useCitySearch from "../../src/hooks/useCitySearch";
 
 type Step = {
   id: string;
@@ -40,7 +41,9 @@ export default function RoutePlannerInput({
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [steps, setSteps] = useState<Step[]>([]);
-  const [mode, setMode] = useState<"idle" | "start" | "end" | "summary">("idle");
+  const [mode, setMode] = useState<"idle" | "start" | "end" | "summary">(
+    "idle"
+  );
 
   const [stepSearchResults, setStepSearchResults] = useState<
     Record<string, any[]>
@@ -129,14 +132,10 @@ export default function RoutePlannerInput({
   const handleValidate = () => {
     if (!startCoords || !endCoords) return;
 
-    const validSteps = steps.filter((s) => s.position).map((s) => s.position!);
+    const validSteps = steps.filter((s) => s.position).map((s) => s.position);
 
-    const points = [
-      { lat: startCoords.latitude, lon: startCoords.longitude },
-      ...validSteps.map((p) => ({ lat: p.latitude, lon: p.longitude })),
-      { lat: endCoords.latitude, lon: endCoords.longitude },
-    ];
-
+    const points = buildRoutePoints(startCoords, steps, endCoords);
+    if (!points) return;
     onSetSteps?.(validSteps);
     getRoute?.(points);
   };
@@ -199,10 +198,7 @@ export default function RoutePlannerInput({
             if (!txt) setShowStartSuggestions(false);
           }}
           onSubmitEditing={validateStart}
-          style={[
-            styles.input,
-            mode === "summary" && styles.readOnlyInput,
-          ]}
+          style={[styles.input, mode === "summary" && styles.readOnlyInput]}
         />
       </View>
 
@@ -232,10 +228,7 @@ export default function RoutePlannerInput({
           editable={mode !== "summary"}
           onChangeText={setEnd}
           onSubmitEditing={validateEnd}
-          style={[
-            styles.input,
-            mode === "summary" && styles.readOnlyInput,
-          ]}
+          style={[styles.input, mode === "summary" && styles.readOnlyInput]}
         />
       </View>
 
