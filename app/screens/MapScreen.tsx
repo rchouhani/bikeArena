@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
 
 import { useRoutePolyline } from "@src/hooks/useRoutePolyline";
-import RoutePlannerInput from "../components/RoutePlannerInput";
+import RoutePlannerInput from "app/components/RoutePlannerInput";
 import Tabbar from "../components/Tabbar";
 
 export default function MapScreen() {
@@ -22,35 +22,55 @@ export default function MapScreen() {
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const [start, setStart] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [end, setEnd] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [steps, setSteps] = useState<{ latitude: number; longitude: number }[]>([]);
+  const [start, setStart] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+  const [end, setEnd] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+  const [steps, setSteps] = useState<{ latitude: number; longitude: number }[]>(
+    []
+  );
 
   const { route, loading, error, getRoute } = useRoutePolyline();
 
   const [activeTab, setActiveTab] = useState("home");
 
-  useEffect(() => {
-    (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        setErrorMsg("Permission refusée");
-        return;
-      }
+useEffect(() => {
+  (async () => {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") {
+      setErrorMsg("Permission refusée");
+      return;
+    }
 
-      const loc = await Location.getCurrentPositionAsync({});
-      setPosition({
-        latitude: loc.coords.latitude,
-        longitude: loc.coords.longitude,
-      });
-    })();
-  }, []);
+    let loc = null;
+
+    try {
+      loc = await Location.getCurrentPositionAsync({});
+    } catch (e) {
+      console.log("Erreur récupération position", e);
+    }
+
+    if (!loc || !loc.coords) {
+      console.log("Position actuelle indisponible");
+      return;
+    }
+
+    setPosition({
+      latitude: loc.coords.latitude,
+      longitude: loc.coords.longitude,
+    });
+  })();
+}, []);
 
   useEffect(() => {
     if (!route?.coords?.length) return;
 
-    const lats = route.coords.map(c => c.latitude);
-    const lons = route.coords.map(c => c.longitude);
+    const lats = route.coords.map((c) => c.latitude);
+    const lons = route.coords.map((c) => c.longitude);
 
     setRegion({
       latitude: (Math.min(...lats) + Math.max(...lats)) / 2,
@@ -67,7 +87,11 @@ export default function MapScreen() {
         {start && <Marker coordinate={start} title="Départ" pinColor="green" />}
         {end && <Marker coordinate={end} title="Arrivée" pinColor="red" />}
         {route?.coords?.length > 0 && (
-          <Polyline coordinates={route.coords} strokeWidth={4} strokeColor="blue" />
+          <Polyline
+            coordinates={route.coords}
+            strokeWidth={4}
+            strokeColor="blue"
+          />
         )}
       </MapView>
 
