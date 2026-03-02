@@ -1,7 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import useCitySearch from "@src/hooks/useCitySearch";
 import { searchCity } from "@src/services/nominatim";
-import { buildRoutePoints } from "@src/utils/routePlanner.utils";
+import {
+  buildRoutePoints,
+  extractValidStepCoords,
+} from "@src/utils/routePlanner.utils";
 import React, { useState } from "react";
 import {
   FlatList,
@@ -50,22 +53,8 @@ export default function RoutePlannerInput({
   >({});
   const [activeStepId, setActiveStepId] = useState<string | null>(null);
 
-  /** 🔹 contrôle explicite de l’affichage des suggestions départ */
-  const [showStartSuggestions, setShowStartSuggestions] = useState(false);
-
   const { results: startResults } = useCitySearch(start);
   const { results: endResults } = useCitySearch(end);
-
-  const validateStart = () => {
-    if (!start.trim()) return;
-    setShowStartSuggestions(false);
-    setMode("end");
-  };
-
-  const validateEnd = () => {
-    if (!end.trim()) return;
-    setMode("summary");
-  };
 
   const addStep = () => {
     setSteps((prev) => [
@@ -85,6 +74,16 @@ export default function RoutePlannerInput({
     setStepSearchResults((prev) => ({ ...prev, [id]: results }));
   };
 
+  const validateStart = () => {
+    if (!start.trim()) return;
+    setMode("end");
+  };
+
+  const validateEnd = () => {
+      if (!end.trim()) return;
+      setMode("summary")
+  }
+
   const removeStep = (id: string) => {
     setSteps((prev) => prev.filter((s) => s.id !== id));
     setStepSearchResults((prev) => {
@@ -97,14 +96,11 @@ export default function RoutePlannerInput({
   const handleSelectStart = (lat: number, lon: number, name: string) => {
     setStart(name);
     onSetStart?.({ latitude: lat, longitude: lon });
-    setShowStartSuggestions(false);
-    setMode("end");
   };
 
   const handleSelectEnd = (lat: number, lon: number, name: string) => {
     setEnd(name);
     onSetEnd?.({ latitude: lat, longitude: lon });
-    setMode("summary");
   };
 
   const handleSelectStep = (
@@ -132,11 +128,11 @@ export default function RoutePlannerInput({
   const handleValidate = () => {
     if (!startCoords || !endCoords) return;
 
-    const validSteps = steps.filter((s) => s.position).map((s) => s.position);
+    const validStepsCoords = extractValidStepCoords(steps);
 
-    const points = buildRoutePoints(startCoords, steps, endCoords);
+    const points = buildRoutePoints(startCoords, validStepsCoords, endCoords);
     if (!points) return;
-    onSetSteps?.(validSteps);
+    onSetSteps?.(validStepsCoords);
     getRoute?.(points);
   };
 
@@ -188,21 +184,19 @@ export default function RoutePlannerInput({
         <TextInput
           value={start}
           placeholder="Ville de départ"
-          editable={mode !== "summary"}
+          editable
           onFocus={() => {
             setMode("start");
-            setShowStartSuggestions(true);
           }}
           onChangeText={(txt) => {
             setStart(txt);
-            if (!txt) setShowStartSuggestions(false);
           }}
           onSubmitEditing={validateStart}
           style={[styles.input, mode === "summary" && styles.readOnlyInput]}
         />
       </View>
 
-      {showStartSuggestions && startResults.length > 0 && (
+      {mode === "start" && startResults.length > 0 && (
         <FlatList
           data={startResults}
           keyExtractor={(i, idx) => i.osm_id?.toString() ?? `${idx}`}
@@ -225,14 +219,15 @@ export default function RoutePlannerInput({
         <TextInput
           value={end}
           placeholder="Ville d'arrivée"
-          editable={mode !== "summary"}
+          editable
+          onFocus={() => setMode("end")}
           onChangeText={setEnd}
           onSubmitEditing={validateEnd}
           style={[styles.input, mode === "summary" && styles.readOnlyInput]}
         />
       </View>
 
-      {mode !== "summary" && endResults.length > 0 && (
+      {mode !== "end" && endResults.length > 0 && (
         <FlatList
           data={endResults}
           keyExtractor={(i, idx) => i.osm_id?.toString() ?? `${idx}`}
@@ -294,10 +289,9 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   actionsRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginTop: 6,
-  },
+  borderWidth: 1,
+  borderColor: "red",
+},
   suggestion: {
     padding: 6,
     backgroundColor: "#eee",

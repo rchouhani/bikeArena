@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { searchCity } from "../../src/services/nominatim";
-import { CitySearchResult } from "../types/geo";
+import { CitySearchResult } from "../types/CitySearchResult";
 
 export default function useCitySearch(query: string) {
   const [results, setResults] = useState<CitySearchResult[]>([]);

@@ -1,46 +1,85 @@
-import { fetchBikeRoute, LatLng } from "@src/services/osrm";
-import { useEffect, useState } from "react";
+import { searchCity } from "@src/services/nominatim";
+import { CitySearchResult } from "@src/types/CitySearchResult";
+import { useState } from "react";
 
-type Point = {
+export type Step = {
+  id: string;
   label: string;
-  lat: number;
-  lon: number;
+  position: { latitude: number; longitude: number } | null;
 };
 
-export function useRoutePolyline(
-  start: Point | null,
-  steps: Point[],
-  end: Point | null
-) {
-  const [polyline, setPolyline] = useState<
-    { latitude: number; longitude: number }[] | null
-  >(null);
-  const [loading, setLoading] = useState(false);
+type StepId = string;
 
-  useEffect(() => {
-    async function fetchRoute() {
-      if (!start || !end) return;
+export function useRoutePlanner() {
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+  const [steps, setSteps] = useState<Step[]>([]);
 
-      const points: LatLng[] = [
-        { lat: start.lat, lon: start.lon },
-        ...steps.map((s) => ({ lat: s.lat, lon: s.lon })),
-        { lat: end.lat, lon: end.lon },
-      ];
+  const [stepSearchResults, setStepSearchResults] = useState<
+    Record<StepId, CitySearchResult[]>
+  >({});
+  const [activeStepId, setActiveStepId] = useState<string | null>(null);
 
-      setLoading(true);
-      try {
-        const route = await fetchBikeRoute(points);
-        setPolyline(route?.coords ?? null);
-      } catch (err) {
-        console.log("Erreur OSRM : ", err);
-        setPolyline(null);
-      } finally {
-        setLoading(false);
-      }
-    }
+  const updateStep = async (id: string, value: string) => {
+    setSteps((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, label: value } : s))
+    );
 
-    fetchRoute();
-  }, [start, steps, end]);
+    if (value.length < 3) return;
 
-  return { polyline, loading };
+    const results = await searchCity(value);
+    setStepSearchResults((prev) => ({ ...prev, [id]: results }));
+  };
+
+  const addStep = () => {
+    setSteps((prev) => [
+      ...prev,
+      { id: Date.now().toString(), label: "", position: null },
+    ]);
+  };
+
+  const removeStep = (id: string) => {
+    setSteps((prev) => prev.filter((s) => s.id !== id));
+    setStepSearchResults((prev) => {
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
+  };
+
+  const selectStep = (id: string, lat: number, lon: number, name: string) => {
+    setSteps((prev) =>
+      prev.map((step) =>
+        step.id === id
+          ? {
+              ...step,
+              label: name,
+              position: { latitude: lat, longitude: lon },
+            }
+          : step
+      )
+    );
+
+    setStepSearchResults((prev) => ({ ...prev, [id]: [] }));
+    setActiveStepId(null);
+  };
+
+  return {
+    start,
+    end,
+    steps,
+    activeStepId,
+    stepSearchResults,
+    
+    setStart,
+    setEnd,
+    setSteps,
+    setActiveStepId,
+    setStepSearchResults,
+
+    addStep,
+    removeStep,
+    updateStep,
+    selectStep,
+  }
 }

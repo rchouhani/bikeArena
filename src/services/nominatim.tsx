@@ -1,4 +1,4 @@
-import { CitySearchResult } from "../types/geo";
+import { CitySearchResult } from "../types/CitySearchResult";
 
 export async function searchCity(query: string): Promise<CitySearchResult[]> {
     if(!query.trim()) return [];
