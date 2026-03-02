@@ -4,24 +4,9 @@ Application mobile expérimentale développée en React Native visant à combine
 
 ---
 
-## 🔎 Aperçu du projet
-
-**Bike Arena** est une application mobile conçue comme un équivalent orienté cyclisme d’un outil de navigation type Google Maps, basé sur OpenStreetMap.
-
-L’objectif est de permettre aux utilisateurs de :
-
-- créer leurs trajets à vélo,
-- retrouver des parcours adaptés à leur pratique,
-- défier des amis via l’application,
-- centraliser des services utiles aux cyclistes.
-
-Ce projet s’inscrit dans une démarche d’apprentissage du développement mobile tout en restant dans l’écosystème JavaScript.
-
----
-
 ## 🎯 Contexte et objectifs
 
-Ce projet est né d’un contexte personnel : utilisant le vélo quotidiennement (trajets école, déplacements, pratique en club de compétition), j’ai souhaité relier deux passions :
+**Bike Arena** est né d’un contexte personnel : utilisant le vélo quotidiennement (trajets école, déplacements, pratique en club de compétition), j’ai souhaité relier deux passions :
 
 - le **cyclisme**
 - le **développement logiciel**
@@ -49,10 +34,10 @@ L’idée était de créer un espace — *Bike Arena* — où chaque cycliste po
 - Application mobile React Native
 - Environnement Expo
 - Exploration de la cartographie via OpenStreetMap
-- Base conceptuelle d’une application sociale autour du vélo
+- Création de trajets personnalisés
 
 ### Fonctionnalités envisagées
-- Création de trajets personnalisés
+- Base conceptuelle d’une application sociale autour du vélo
 - Défis entre amis
 - Filtres selon types de routes
 - Recherche de services cyclistes (réparateurs, etc.)
@@ -62,13 +47,10 @@ L’idée était de créer un espace — *Bike Arena* — où chaque cycliste po
 ## 🛠️ Stack technique
 
 - **React Native**
-- **Expo**
+- **Expo Framework**
 - **JavaScript**
 - **Android Studio**
 - **VS Code**
-- Extension Expo (VS Code)
-
-> Définition d’Expo : À compléter
 
 ---
 
@@ -105,10 +87,10 @@ Cette expérience a mis en évidence l’importance :
 Évolutions envisagées :
 
 - Implémenter les fonctionnalités prévues :
-  - création de trajets
   - défis entre utilisateurs
   - filtres de routes
   - services cyclistes
+
 - Adopter une approche **test-first** :
   - génération de tests en amont
   - implémentation progressive des fonctionnalités
@@ -125,5 +107,3 @@ Développeur Fullstack en reconversion
 - Portfolio : https://romainchouhani.vercel.app
 
 ---
-
-🚧 Projet expérimental mêlant apprentissage technique et passion personnelle pour le cyclisme.
